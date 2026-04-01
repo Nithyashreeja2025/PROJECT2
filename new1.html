@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head><title>ATM Machine</title></head>
+<body>
+<div id="app" style="max-width:400px;margin:40px auto;border:2px solid black;padding:20px;font-family:monospace"></div>
+<script>
+// Accounts DB
+var db = {"1111":{pin:"1234",bal:50000,name:"Alice"},"2222":{pin:"5678",bal:30000,name:"Bob"}};
+// ATM Session State
+var s = {card:null,tries:0,log:[],cash:100000,on:true,timer:null,idle:null};
+// Helpers
+function show(html){ document.getElementById("app").innerHTML=html; }
+function link(label,fn){ return "<a href='#' onclick='"+fn+"'>"+label+"</a>"; }
+// Timers: 60s txn timeout + 2min idle card retain
+function tick(){
+  clearTimeout(s.timer); clearTimeout(s.idle);
+  s.timer=setTimeout(function(){ alert("60s timeout! Session cancelled."); logout(); home(); },60000);
+  s.idle=setTimeout(function(){ alert("Idle 2 min! Card retained. Contact bank."); logout(); home(); },120000);
+}
+function logout(){ s.card=null; s.tries=0; s.log=[]; clearTimeout(s.timer); clearTimeout(s.idle); }
+
+// Home - 24x7, one customer at a time
+function home(){
+  if(!s.on) return show("<h3>ATM is OFF</h3>"+link("Operator Panel","opanel()"));
+  show("<h2>ATM - Welcome</h2>Operating 24x7 | One customer at a time<br><br>"+
+    "Card No: <input id='c' maxlength='4'><br><br>"+
+    "<button onclick='insertCard()'>Insert Card</button><br><br>"+link("Operator Panel","opanel()"));
+}
+// Magnetic stripe card reader simulation
+function insertCard(){
+  var c=document.getElementById("c").value;
+  if(!db[c]) return alert("Card not recognized.");
+  s.card=c; s.tries=0; tick();
+  show("<h2>Enter PIN</h2><span id='m'></span><br>"+
+    "<input id='p' type='password' maxlength='4'><br><br>"+
+    "<button onclick='checkPin()'>Submit</button> "+link("Cancel","cancelCard()"));
+}
+// PIN: 3 wrong = card retained
+function checkPin(){
+  var p=document.getElementById("p").value;
+  if(p===db[s.card].pin){ tick(); menu(); }
+  else{
+    s.tries++;
+    if(s.tries>=3){ alert("3 failed attempts! Card retained. Contact bank."); logout(); home(); }
+    else{ document.getElementById("m").innerText="Wrong PIN. "+(3-s.tries)+" attempt(s) left."; }
+  }
+}
+function cancelCard(){ logout(); home(); }
+
+// Main menu - keyboard and display interaction
+function menu(){
+  tick();
+  show("<h2>Main Menu</h2>Welcome, "+db[s.card].name+"<br><br>"+
+    link("1. Withdraw Cash","withdraw()")+"<br>"+
+    link("2. Deposit Cash","deposit()")+"<br>"+
+    link("3. Balance Enquiry","balance()")+"<br>"+
+    link("4. Transfer Amount","transfer()")+"<br>"+
+    link("5. Print Receipt","receipt()")+"<br><br>"+
+    link("Logout / Eject Card","eject()"));
+}
+function eject(){ logout(); alert("Card ejected. Thank you!"); home(); }
+
+// Withdraw - cash dispenser, multiples of 100
+function withdraw(){
+  tick();
+  show("<h2>Withdraw Cash</h2>Amount (multiples of 100):<br>"+
+    "<input id='a' type='number' step='100' min='100'><br><br>"+
+    "<button onclick='doW()'>Withdraw</button> "+link("Back","menu()")+"<p id='m'></p>");
+}
+function doW(){
+  var a=+document.getElementById("a").value, msg=document.getElementById("m");
+  if(!a||a%100!==0) return msg.innerText="Amount must be a multiple of 100.";
+  if(a>db[s.card].bal) return msg.innerText="Insufficient account balance.";
+  if(a>s.cash) return msg.innerText="ATM has insufficient cash.";
+  db[s.card].bal-=a; s.cash-=a;
+  s.log.push("Withdraw Rs."+a+" | Bal: Rs."+db[s.card].bal+" | "+new Date().toLocaleTimeString());
+  msg.innerText="Cash dispensed: Rs."+a+". New Balance: Rs."+db[s.card].bal;
+}
+
+// Deposit - envelope slot, multiples of 100
+function deposit(){
+  tick();
+  show("<h2>Deposit Cash</h2>Insert envelope in slot.<br>Amount (multiples of 100):<br>"+
+    "<input id='a' type='number' step='100' min='100'><br><br>"+
+    "<button onclick='doD()'>Deposit</button> "+link("Back","menu()")+"<p id='m'></p>");
+}
+function doD(){
+  var a=+document.getElementById("a").value, msg=document.getElementById("m");
+  if(!a||a%100!==0) return msg.innerText="Amount must be a multiple of 100.";
+  db[s.card].bal+=a; s.cash+=a;
+  s.log.push("Deposit Rs."+a+" | Bal: Rs."+db[s.card].bal+" | "+new Date().toLocaleTimeString());
+  msg.innerText="Deposited: Rs."+a+". New Balance: Rs."+db[s.card].bal;
+}
+
+// Balance enquiry
+function balance(){
+  tick();
+  s.log.push("Balance Enquiry | Bal: Rs."+db[s.card].bal+" | "+new Date().toLocaleTimeString());
+  show("<h2>Balance Enquiry</h2>Account: "+s.card+"<br>Name: "+db[s.card].name+
+    "<br>Balance: <b>Rs."+db[s.card].bal+"</b><br><br>"+link("Back","menu()"));
+}
+
+// Transfer between any two accounts
+function transfer(){
+  tick();
+  show("<h2>Transfer Amount</h2>To Account No: <input id='t' maxlength='4'><br>"+
+    "Amount (multiples of 100): <input id='a' type='number' step='100'><br><br>"+
+    "<button onclick='doT()'>Transfer</button> "+link("Back","menu()")+"<p id='m'></p>");
+}
+function doT(){
+  var t=document.getElementById("t").value, a=+document.getElementById("a").value, msg=document.getElementById("m");
+  if(!db[t]) return msg.innerText="Target account not found.";
+  if(t===s.card) return msg.innerText="Cannot transfer to same account.";
+  if(!a||a%100!==0) return msg.innerText="Amount must be a multiple of 100.";
+  if(a>db[s.card].bal) return msg.innerText="Insufficient balance.";
+  db[s.card].bal-=a; db[t].bal+=a;
+  s.log.push("Transfer Rs."+a+" to Acc:"+t+" | Bal: Rs."+db[s.card].bal+" | "+new Date().toLocaleTimeString());
+  msg.innerText="Transferred Rs."+a+" to Account "+t+". Balance: Rs."+db[s.card].bal;
+}
+
+// Print receipt - receipt printer simulation
+function receipt(){
+  tick();
+  var r="===== ATM RECEIPT =====\nAcc: "+s.card+" | "+db[s.card].name+
+    "\nDate: "+new Date().toLocaleString()+"\n-----------------------\n"+
+    (s.log.length?s.log.join("\n"):"No transactions this session.")+
+    "\n=======================\nBalance: Rs."+db[s.card].bal+"\nThank you for banking!";
+  show("<h2>Receipt (Printer)</h2><pre>"+r+"</pre>"+link("Back to Menu","menu()"));
+}
+
+// Operator panel - key switch ON/OFF, verify cash before start
+function opanel(){
+  show("<h2>Operator Panel</h2>ATM Status: <b>"+(s.on?"ON":"OFF")+"</b><br>"+
+    "Cash on Hand: Rs."+s.cash+"<br><br>"+
+    (s.on?"<button onclick='turnOff()'>Turn ATM OFF</button>":
+    "Verify cash before starting:<br><input id='op' type='number' placeholder='Enter cash amount'><br><br>"+
+    "<button onclick='turnOn()'>Turn ATM ON</button>")+"<br><br>"+link("Back","home()"));
+}
+function turnOff(){ s.on=false; logout(); alert("ATM OFF. Remove envelopes, reload cash and receipts."); opanel(); }
+function turnOn(){
+  var c=+document.getElementById("op").value;
+  if(!c||c<=0) return alert("Enter valid total cash on hand.");
+  s.cash=c; s.on=true; home();
+}
+
+
+window.onload=home;
+</script>
+</body>
+</html>
