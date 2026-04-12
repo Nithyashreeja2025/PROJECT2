@@ -1,0 +1,21 @@
+stages:
+  - build
+  - test
+  - deploy
+
+build-job:
+  stage: build
+  script:
+    - echo "Running build job"
+    - ls *.html
+
+test-job:
+  stage: test
+  script:
+    - echo "Running test job"
+    -  test -f index.html && echo "File exists" || echo "File doesn't exist"
+
+deploy-job:
+  stage: deploy
+  script:
+    - echo "Running deploy stage"
