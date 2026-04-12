@@ -1,0 +1,28 @@
+import mlflow
+
+mlflow.start_run()
+
+# Simulating user flow from your project
+
+# Login page
+mlflow.log_param("page", "login")
+mlflow.log_metric("login_success", 1)
+
+# Dashboard browsing
+mlflow.log_param("category_selected", "THRILLER")
+mlflow.log_metric("books_viewed", 3)
+
+# Book page (Layla)
+mlflow.log_param("book_selected", "Layla")
+mlflow.log_metric("price", 300)
+
+# Cart page
+mlflow.log_metric("items_in_cart", 2)
+
+# Order placed
+mlflow.log_param("payment_mode", "Cash on Delivery")
+mlflow.log_metric("order_success", 1)
+
+mlflow.end_run()
+
+print("Bookstore user activity logged in MLflow!")
